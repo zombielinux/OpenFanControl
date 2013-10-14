@@ -1,0 +1,110 @@
+
+
+//Pinouts
+  int THERM_pin = 3;
+  int AC_pin = 9;
+  int PWM_pin = 3;
+  int CAR_pin = 8;
+  int CAR;
+  
+//Circuit Constants  
+  float R2 = 200;
+  float A = .001454437;
+  float B = .0002335551;
+  float C = .0000000872799;
+  
+//Fan Settings
+  float MIN_fan = .15;
+  float MAX_fan = 1;
+  int MIN_temp = 82;
+  int MAX_temp = 92;
+  byte FAN_speed = 0;
+  
+//Calculation Settings
+  int ADC_depth = 1023; //This is the default depth of an arduino Uno, different boards may have different depths. 
+  int PWM_depth = 255;  //This is the default depth of a PWM driver for an arduino, this may change from board to board. 
+  byte FAN_trim = 0;
+  byte ALG_trim = 0;     //This is part of the learning algorithm that finds the optimal fan speed for your desired temperature range. 
+  float COOLANT_temp;
+  float TEMP_prev;
+  byte FAN_speed_prev;
+  
+//DEBUGGING PINS
+  int CAR_on = 12;
+  int AC_on = 13;
+  
+void setup() {
+  //Set pin modes
+    pinMode(AC_pin,INPUT);
+    pinMode(CAR_pin,INPUT);
+    pinMode(PWM_pin,OUTPUT);
+    digitalWrite(CAR_pin,HIGH);
+    FAN_speed_prev=128;
+  //DEBUGGING
+//    Serial.begin(9600);
+//    pinMode(CAR_on,OUTPUT);
+//    pinMode(AC_on,OUTPUT);
+}
+
+double Thermister(int RawADC) {
+ double TEMP;
+ TEMP = ((1024*R2/RawADC) - R2);
+ TEMP = log(TEMP);
+ TEMP = 1 / (A + (B + (C * TEMP * TEMP ))* TEMP );
+ TEMP = TEMP - 273.15;            // Convert Kelvin to Celcius
+ return TEMP;
+}
+ 
+   
+   
+void loop() {
+  CAR= digitalRead(CAR_pin);
+  digitalWrite(CAR_on,LOW);
+  digitalWrite(AC_on,LOW);
+  FAN_speed= FAN_speed_prev; 
+  if(CAR == 0) {
+
+//  Serial.print("Car is On  ");      //DEBUGGING LINE
+
+    digitalWrite(CAR_on,HIGH);
+    COOLANT_temp = Thermister(analogRead(3));
+ 
+//Serial.print(COOLANT_temp);         //DEBUGGING LINE
+//Serial.print(" C  ");                //DEBUGGING LINE
+    if(COOLANT_temp > MIN_temp) {
+           
+       if(COOLANT_temp > MAX_temp) {
+         FAN_speed=MAX_fan*PWM_depth;
+         analogWrite(PWM_pin,FAN_speed);
+         delay(1000); }
+       else {
+           
+           if (TEMP_prev < COOLANT_temp) {
+              FAN_speed = FAN_speed_prev++;
+            }
+           else if(TEMP_prev > COOLANT_temp) {
+              FAN_speed = FAN_speed_prev--;
+            }
+           else {
+             FAN_speed = FAN_speed_prev;}
+        
+//Serial.print(FAN_speed-FAN_speed_prev);            //DEBUGGING LINE
+//Serial.print(" TRIM  ");                            //
+
+            analogWrite(PWM_pin,FAN_speed);
+            
+//Serial.print(FAN_speed+ALG_trim);  //DEBUGGING LINE            
+//Serial.print(" Speed  ");          //DEBUGGING LINE
+              
+            TEMP_prev = COOLANT_temp;
+            delay(1000);
+       }}
+       else {
+         FAN_speed = MIN_fan*PWM_depth;
+         analogWrite(PWM_pin,FAN_speed);
+       }}
+  else {
+  analogWrite(PWM_pin,0); }   
+//Serial.print(FAN_speed);          //DEBUGGING LINE
+//Serial.println(" bits");          //DEBUGGING LINE
+ }
